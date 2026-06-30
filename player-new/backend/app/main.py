@@ -1,6 +1,6 @@
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -46,3 +46,13 @@ if static_dir.exists():
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "VibePlayer API"}
+
+
+@app.post("/api/v1/admin/seed")
+async def trigger_seed():
+    try:
+        from seed import seed
+        await seed()
+        return {"status": "ok", "message": "Seed completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
