@@ -6,6 +6,7 @@ from sqlalchemy import text as sa_text
 from app.db import engine, async_session, Base
 from app.models.user import User, AuthProvider
 from app.models.track import Track
+from app.services.auth import hash_password
 
 
 async def fetch_cover(title: str, artist: str) -> str | None:
@@ -141,6 +142,7 @@ async def seed():
                 id=uuid.uuid4(),
                 email="dev@example.com",
                 username="Dev User",
+                password_hash=hash_password("dev123"),
                 auth_provider=AuthProvider.email,
             )
             session.add(user)

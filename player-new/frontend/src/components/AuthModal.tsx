@@ -15,7 +15,9 @@ export default function AuthModal() {
     try {
       if (mode === 'login') await login(email, password)
       else await register(email, username, password)
-    } catch { setError('Ошибка. Проверьте данные.') }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Ошибка подключения к серверу')
+    }
   }
 
   return (
