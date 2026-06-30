@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     S3_PUBLIC_URL: str = "https://pub-xxxxx.r2.dev"
     GOOGLE_CLIENT_ID: str = ""
     APPLE_CLIENT_ID: str = ""
-    CORS_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,https://mp3-ecru.vercel.app"
 
     @property
     def cors_origins_list(self) -> list[str]:
