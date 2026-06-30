@@ -5,13 +5,12 @@ import hashlib
 import io
 import tempfile
 import os
+import time
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import numpy as np
-import redis.asyncio as aioredis
 
 from app.config import settings
 from app.db import get_db
@@ -20,14 +19,31 @@ from app.services.audio import compute_fingerprint, match_fingerprint
 
 router = APIRouter(prefix="/recognize", tags=["recognize"])
 
-redis_client: Optional[aioredis.Redis] = None
+class _MemStore:
+    def __init__(self):
+        self._data: dict[str, tuple[str, float]] = {}
+    async def setex(self, key: str, ttl: int, value: str):
+        self._data[key] = (value, time.time() + ttl)
+    async def get(self, key: str) -> str | None:
+        entry = self._data.get(key)
+        if entry is None:
+            return None
+        val, expiry = entry
+        if time.time() > expiry:
+            del self._data[key]
+            return None
+        return val
 
+try:
+    import redis.asyncio as _aioredis
+    _redis_impl = _aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    _impl_type = "redis"
+except Exception:
+    _redis_impl = _MemStore()
+    _impl_type = "memory"
 
 async def get_redis():
-    global redis_client
-    if redis_client is None:
-        redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    return redis_client
+    return _redis_impl
 
 
 class RecognizeResponse(BaseModel):
@@ -121,6 +137,7 @@ async def extract_fingerprint_async(audio_bytes: bytes, filename: str) -> Option
             tmp.write(audio_bytes)
             tmp_path = tmp.name
 
+        import numpy as np
         from scipy.io import wavfile
         sample_rate, data = wavfile.read(tmp_path)
         os.unlink(tmp_path)

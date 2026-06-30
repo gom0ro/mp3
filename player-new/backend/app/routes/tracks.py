@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status,
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-import numpy as np
 
 from app.db import get_db
 from app.models.track import Track
@@ -185,6 +184,7 @@ async def fingerprint_track(
         tmp.write(content)
         tmp_path = tmp.name
     try:
+        import numpy as np
         sample_rate, data = wavfile_read_safe(tmp_path)
         fp = compute_fingerprint(data.astype(np.float32), sample_rate)
         import hashlib, json
@@ -199,6 +199,7 @@ async def fingerprint_track(
 
 
 def wavfile_read_safe(path: str):
+    import numpy as np
     from scipy.io import wavfile
     sample_rate, data = wavfile.read(path)
     if data.dtype == np.int16:

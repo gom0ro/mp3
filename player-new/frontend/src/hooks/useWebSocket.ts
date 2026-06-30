@@ -7,7 +7,10 @@ interface UseWebSocketOptions {
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const { url = 'ws://localhost:8000/ws', onMessage } = options
+  const DEFAULT_WS = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/^http/, 'ws') + '/ws'
+    : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
+  const { url = DEFAULT_WS, onMessage } = options
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null)

@@ -9,13 +9,15 @@ from app.config import settings
 
 class S3Storage:
     def __init__(self):
-        self.client = boto3.client(
-            "s3",
-            endpoint_url=settings.S3_ENDPOINT,
-            aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY,
-            config=BotoConfig(signature_version="s3v4"),
-        )
+        self._enabled = bool(settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY)
+        if self._enabled:
+            self.client = boto3.client(
+                "s3",
+                endpoint_url=settings.S3_ENDPOINT,
+                aws_access_key_id=settings.S3_ACCESS_KEY,
+                aws_secret_access_key=settings.S3_SECRET_KEY,
+                config=BotoConfig(signature_version="s3v4"),
+            )
         self.bucket = settings.S3_BUCKET
         self.public_url = settings.S3_PUBLIC_URL
 

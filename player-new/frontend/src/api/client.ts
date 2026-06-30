@@ -1,5 +1,6 @@
 import axios from 'axios'
-const client = axios.create({ baseURL: '/api/v1' })
+const BASE = import.meta.env.VITE_API_URL || '/api/v1'
+const client = axios.create({ baseURL: BASE })
 client.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
