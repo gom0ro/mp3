@@ -1,0 +1,23 @@
+from pydantic_settings import BaseSettings
+from typing import List
+
+
+class Settings(BaseSettings):
+    DATABASE_URL: str = "sqlite+aiosqlite:///./vibeplayer.db"
+    REDIS_URL: str = "redis://localhost:6379/0"
+    SECRET_KEY: str = "changeme-secret-key-please-rotate-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    S3_ENDPOINT: str = "https://your-account.r2.cloudflarestorage.com"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET: str = "vibeplayer-audio"
+    S3_PUBLIC_URL: str = "https://pub-xxxxx.r2.dev"
+    GOOGLE_CLIENT_ID: str = ""
+    APPLE_CLIENT_ID: str = ""
+    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+
+settings = Settings()
