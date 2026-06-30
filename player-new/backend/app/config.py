@@ -3,6 +3,13 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./vibeplayer.db"
+
+    @property
+    def async_database_url(self) -> str:
+        url = self.DATABASE_URL
+        if url.startswith("postgresql://") and "+" not in url.split("://")[0]:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
     REDIS_URL: str = "redis://localhost:6379/0"
     SECRET_KEY: str = "changeme-secret-key-please-rotate-in-production"
     ALGORITHM: str = "HS256"
