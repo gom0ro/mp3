@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 class Settings(BaseSettings):
@@ -15,7 +14,11 @@ class Settings(BaseSettings):
     S3_PUBLIC_URL: str = "https://pub-xxxxx.r2.dev"
     GOOGLE_CLIENT_ID: str = ""
     APPLE_CLIENT_ID: str = ""
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: str = "http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
