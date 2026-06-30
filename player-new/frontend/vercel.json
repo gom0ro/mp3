@@ -1,5 +1,4 @@
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "installCommand": "npm install --unsafe-perm",
-  "buildCommand": "npx vite build"
+  "buildCommand": "node ./node_modules/vite/bin/vite.js build"
 }
