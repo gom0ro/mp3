@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { tracksApi } from '../api/tracks'
 import { usePlayerStore } from '../store/playerStore'
 import { useTracksStore } from '../store/tracksStore'
+import { playTrack } from '../hooks/useAudioEngine'
 import type { RecognitionResult } from '../types'
 
 export default function Recognize() {
@@ -71,12 +72,15 @@ export default function Recognize() {
     const existing = queue.findIndex(t => t.id === result.track_id)
     if (existing >= 0) {
       setCurrentIndex(existing)
+      const t = queue[existing]
+      if (t) playTrack(t)
     } else {
       try {
         const { data } = await tracksApi.get(result.track_id)
         addTrack(data)
         addToQueue(data)
         setCurrentIndex(queue.length)
+        playTrack(data)
       } catch { }
     }
     setStatus('idle')

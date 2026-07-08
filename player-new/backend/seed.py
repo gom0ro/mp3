@@ -178,7 +178,7 @@ async def seed():
                 title=title,
                 artist=artist,
                 filename=samples[i % 3],
-                file_url=f"http://localhost:8000/static/audio/{samples[i % 3]}",
+                file_url=f"/static/audio/{samples[i % 3]}",
                 cover_url=cover_url,
                 duration=duration if duration > 0 else 240,
                 file_size=0,

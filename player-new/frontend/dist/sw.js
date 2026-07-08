@@ -10,6 +10,16 @@ self.addEventListener('install', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
 
+  // Skip API and WebSocket calls
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
+    return
+  }
+
+  // Skip cross-origin requests (backend API calls)
+  if (url.origin !== self.location.origin) {
+    return
+  }
+
   // Cache audio files on first play
   if (url.pathname.match(/\.(mp3|wav|ogg|flac|aac|m4a|wma)$/i)) {
     e.respondWith(

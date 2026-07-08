@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 import { TrackCoverImg } from '../utils/cover'
@@ -20,30 +20,53 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
 export default function PlayerBar({ activeTab, onTabChange }: { activeTab: string; onTabChange: (t: string) => void }) {
   const { track, isPlaying, currentTime, duration, toggle, skip, seek } = useAudioEngine()
   const barRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragPct, setDragPct] = useState(0)
 
-  const handleSeek = useCallback((e: React.MouseEvent) => {
-    if (!duration || !barRef.current) return
+  const getTimeFromEvent = useCallback((e: MouseEvent | React.MouseEvent) => {
+    if (!duration || !barRef.current) return 0
     const r = barRef.current.getBoundingClientRect()
-    seek(((e.clientX - r.left) / r.width) * duration)
-  }, [duration, seek])
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration
+  }, [duration])
+
+  const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!duration) return
+    setDragging(true)
+    const t = getTimeFromEvent(e)
+    setDragPct(duration > 0 ? (t / duration) * 100 : 0)
+    seek(t)
+
+    const onMove = (ev: MouseEvent) => {
+      const t2 = getTimeFromEvent(ev)
+      setDragPct(duration > 0 ? (t2 / duration) * 100 : 0)
+      seek(t2)
+    }
+    const onUp = () => {
+      setDragging(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [duration, seek, getTimeFromEvent])
 
   if (!track || activeTab === 'player') return null
 
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
+  const pct = dragging ? dragPct : (duration > 0 ? (currentTime / duration) * 100 : 0)
 
   return (
     <div className="fixed left-0 right-0 z-50 bg-[#181818] border-t border-white/5 bottom-[56px] md:bottom-0">
-      {/* Clickable progress bar */}
+      {/* Draggable progress bar */}
       <div
         ref={barRef}
-        onClick={handleSeek}
+        onMouseDown={handleProgressMouseDown}
         className="h-1 bg-white/10 w-full cursor-pointer group relative"
       >
         <div
           className="h-full rounded-full bg-white relative"
           style={{ width: `${pct}%` }}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" style={dragging ? { opacity: 1 } : undefined} />
         </div>
       </div>
 

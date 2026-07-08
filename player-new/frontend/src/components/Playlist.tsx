@@ -7,6 +7,7 @@ import { usePlaylistsStore } from '../store/playlistsStore'
 import { tracksApi } from '../api/tracks'
 import { useLikedTracks } from '../hooks/useLikedTracks'
 import { TrackCoverImg } from '../utils/cover'
+import { playTrack } from '../hooks/useAudioEngine'
 
 function fmt(s: number) { if (!isFinite(s) || s < 0) return '--:--'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
 
@@ -80,13 +81,13 @@ export default function Playlist() {
         <h1 className="text-2xl font-bold text-white">Треки</h1>
         {tracks.length > 0 && (
           <div className="flex gap-1.5">
-            <button onClick={() => { setQueue(filtered); setCurrentIndex(0) }}
+            <button onClick={() => { setQueue(filtered); if (filtered[0]) playTrack(filtered[0]) }}
               className="flex items-center gap-1 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold rounded-full transition-colors cursor-pointer"
             >
               <svg viewBox="0 0 24 24" width={12} height={12} fill="currentColor"><polygon points="8,5 8,19 19,12" /></svg>
               Play all
             </button>
-            <button onClick={() => { const shuffled = [...filtered].sort(() => Math.random() - 0.5); setQueue(shuffled); setCurrentIndex(0) }}
+            <button onClick={() => { const shuffled = [...filtered].sort(() => Math.random() - 0.5); setQueue(shuffled); if (shuffled[0]) playTrack(shuffled[0]) }}
               className="flex items-center gap-1 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold rounded-full transition-colors cursor-pointer"
             >
               <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M16 3h5v5" /><path d="M21 3l-7 7" /><path d="M8 21H3v-5" /><path d="M3 21l7-7" /><path d="M16 21h5v-5" /><path d="M21 21l-3.5-3.5" /><path d="M3 3l3.5 3.5" /></svg>
@@ -114,7 +115,7 @@ export default function Playlist() {
           {filtered.map((t, i) => (
             <motion.div key={t.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.15 }}
               onContextMenu={e => { e.preventDefault(); setContextMenu({ track: t, x: e.clientX, y: e.clientY }) }}
-              onClick={() => { const idx = queue.findIndex(q => q.id === t.id); if (idx >= 0) { setCurrentIndex(idx) } else { addToQueue(t); setCurrentIndex(queue.length) } }}
+              onClick={() => { const idx = queue.findIndex(q => q.id === t.id); if (idx >= 0) { setCurrentIndex(idx); playTrack(t) } else { addToQueue(t); setCurrentIndex(queue.length); playTrack(t) } }}
               className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors group ${t.id === activeId ? 'bg-white/5' : 'hover:bg-white/5'}`}
             >
               <div className="w-8 h-8 rounded overflow-hidden bg-[#282828] shrink-0">

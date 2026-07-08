@@ -7,6 +7,7 @@ export const _audio = new Audio()
 let _audioCtx: AudioContext | null = null
 let _analyser: AnalyserNode | null = null
 let _source: MediaElementAudioSourceNode | null = null
+let _currentTrackId: string | null = null
 
 function ensureAudioCtx() {
   if (!_audioCtx) {
@@ -19,6 +20,26 @@ function ensureAudioCtx() {
     _analyser.connect(_audioCtx.destination)
   }
   if (_audioCtx.state === 'suspended') _audioCtx.resume()
+}
+
+function resolveFileUrl(fileUrl: string): string {
+  if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) return fileUrl
+  const apiBase = import.meta.env.VITE_API_URL || '/api/v1'
+  if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
+    const origin = new URL(apiBase).origin
+    return `${origin}${fileUrl}`
+  }
+  return fileUrl
+}
+
+// Call directly from click handlers to play during user gesture
+export function playTrack(track: Track) {
+  if (_currentTrackId === track.id && !_audio.paused) return
+  ensureAudioCtx()
+  _currentTrackId = track.id
+  _audio.src = resolveFileUrl(track.file_url)
+  _audio.load()
+  _audio.play().catch(() => {})
 }
 
 export function useAudioEngine() {
@@ -40,9 +61,11 @@ export function useAudioEngine() {
   }, [])
 
   const play = useCallback((track: Track) => {
+    if (_currentTrackId === track.id && !audioRef.current.paused) return
     initAudio()
     if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume()
-    audioRef.current.src = track.file_url
+    _currentTrackId = track.id
+    audioRef.current.src = resolveFileUrl(track.file_url)
     audioRef.current.load()
     audioRef.current.play().catch(() => {})
   }, [initAudio])
@@ -84,18 +107,20 @@ export function useAudioEngine() {
         if (id) useTracksStore.getState().updateTrack(id, { duration: Math.round(a.duration) })
       }
     }
+    const onError = () => { setIsPlaying(false) }
     a.addEventListener('timeupdate', onTime)
     a.addEventListener('ended', onEnd)
     a.addEventListener('play', onPlay)
     a.addEventListener('pause', onPause)
     a.addEventListener('loadedmetadata', onLoad)
-    return () => { a.removeEventListener('timeupdate', onTime); a.removeEventListener('ended', onEnd); a.removeEventListener('play', onPlay); a.removeEventListener('pause', onPause); a.removeEventListener('loadedmetadata', onLoad) }
+    a.addEventListener('error', onError)
+    return () => { a.removeEventListener('timeupdate', onTime); a.removeEventListener('ended', onEnd); a.removeEventListener('play', onPlay); a.removeEventListener('pause', onPause); a.removeEventListener('loadedmetadata', onLoad); a.removeEventListener('error', onError) }
   }, [currentIndex, queue.length, repeatMode, setCurrentIndex, setCurrentTime, setDuration, setIsPlaying])
 
   useEffect(() => {
     if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
       const currentTrack = queue[currentIndex]
-      if (audioRef.current.src !== currentTrack.file_url) {
+      if (_currentTrackId !== currentTrack.id) {
         play(currentTrack)
       }
     }

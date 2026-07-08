@@ -5,6 +5,7 @@ import { useTracksStore } from '../store/tracksStore'
 import { usePlaylistsStore } from '../store/playlistsStore'
 import { tracksApi } from '../api/tracks'
 import { TrackCoverImg } from '../utils/cover'
+import { playTrack } from '../hooks/useAudioEngine'
 import type { Playlist } from '../types'
 
 function fmt(s: number) { if (!isFinite(s) || s < 0) return '--:--'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
@@ -146,7 +147,7 @@ export default function MediaLibrary() {
               <AnimatePresence>
                 {selectedTracks.map(t => (
                   <motion.div key={t.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
-                    onClick={() => { const idx = queue.findIndex(q => q.id === t.id); if (idx >= 0) { setCurrentIndex(idx) } else { addToQueue(t); setCurrentIndex(queue.length) } }}
+                    onClick={() => { const idx = queue.findIndex(q => q.id === t.id); if (idx >= 0) { setCurrentIndex(idx); playTrack(t) } else { addToQueue(t); setCurrentIndex(queue.length); playTrack(t) } }}
                     className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors group ${t.id === activeId ? 'bg-white/5' : 'hover:bg-white/5'}`}
                   >
                   <div className="w-8 h-8 rounded overflow-hidden bg-[#282828] shrink-0">

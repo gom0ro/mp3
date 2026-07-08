@@ -1,6 +1,7 @@
 import { useState, useEffect, type ImgHTMLAttributes } from 'react'
 import type { Track } from '../types'
 
+const BASE = (import.meta as any).env?.VITE_API_URL || '/api/v1'
 const cache = new Map<string, string>()
 
 export function TrackCoverImg({ track, ...props }: { track: Track } & ImgHTMLAttributes<HTMLImageElement>) {
@@ -11,13 +12,11 @@ export function TrackCoverImg({ track, ...props }: { track: Track } & ImgHTMLAtt
   useEffect(() => {
     if (track.cover_url || cached) return
     let cancelled = false
-    fetch(
-      `https://api.deezer.com/search?q=artist:"${encodeURIComponent(track.artist)}" track:"${encodeURIComponent(track.title)}"&limit=1`
-    )
+    fetch(`${BASE}/cover/search?artist=${encodeURIComponent(track.artist)}&track=${encodeURIComponent(track.title)}`)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return
-        const url = data?.data?.[0]?.album?.cover_medium
+        const url = data?.cover_url
         if (url) { cache.set(key, url); setCover(url) }
       })
       .catch(() => {})
