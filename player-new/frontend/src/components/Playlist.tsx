@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
 import { usePlayerStore } from '../store/playerStore'
@@ -47,8 +47,6 @@ export default function Playlist() {
       document.removeEventListener('keydown', onKey)
     }
   }, [contextMenu])
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const onDrop = useCallback(async (files: File[]) => {
     const audioFiles = files.filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|aac|m4a|wma)$/i.test(f.name))
@@ -105,7 +103,7 @@ export default function Playlist() {
       </div>
 
       <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all mb-2 ${isDragActive ? 'border-green-400 bg-green-500/10' : 'border-[#333] hover:border-white/20 hover:bg-white/[0.02]'}`}>
-        <input {...getInputProps()} ref={fileInputRef} />
+        <input {...getInputProps()} />
         <svg viewBox="0 0 24 24" width={24} height={24} fill="currentColor" className="inline-block text-[#535353] mb-1"><circle cx="6" cy="18" r="3" /><circle cx="16" cy="17" r="3" /><path d="M9 18V5l12-2v13" /></svg>
         <p className="text-sm text-[#b3b3b3] font-medium">Перетащи файлы сюда</p>
       </div>
