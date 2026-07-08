@@ -1,8 +1,6 @@
 from __future__ import annotations
 import uuid
 import json
-import hashlib
-import io
 import tempfile
 import os
 import time
@@ -86,49 +84,71 @@ async def poll_status(task_id: str, db: AsyncSession = Depends(get_db)):
 async def process_recognition(task_id: str, audio_bytes: bytes, filename: str, db: AsyncSession):
     r = await get_redis()
     try:
-        await r.setex(f"recognition:{task_id}:status", 300, "fingerprinting")
-        fp = await extract_fingerprint_async(audio_bytes, filename)
-        if fp is None:
-            await r.setex(f"recognition:{task_id}:status", 300, "error")
-            return
+        await r.setex(f"recognition:{task_id}:status", 300, "searching_internet")
+        match = await shazam_recognize(audio_bytes)
 
-        await r.setex(f"recognition:{task_id}:status", 300, "matching")
-        result = await db.execute(select(Track).where(Track.fingerprint.isnot(None)))
-        tracks = result.scalars().all()
-
-        stored_fingerprints: list[list[list[float]]] = []
-        track_ids: list[str] = []
-        for t in tracks:
-            if t.fingerprint:
-                stored_fingerprints.append(t.fingerprint)
-                track_ids.append(str(t.id))
-
-        if not stored_fingerprints:
-            await r.setex(f"recognition:{task_id}:status", 300, "completed")
-            await r.setex(f"recognition:{task_id}:result", 300, json.dumps({"match": None, "confidence": 0.0}))
-            return
-
-        best_idx, confidence = match_fingerprint(fp, stored_fingerprints, threshold=0.65)
-        result_data: dict
-        if best_idx >= 0:
-            matched_track = tracks[best_idx]
+        if match:
             result_data = {
                 "match": {
-                    "track_id": str(matched_track.id),
-                    "title": matched_track.title,
-                    "artist": matched_track.artist,
-                    "file_url": matched_track.file_url,
+                    "track_id": None,
+                    "title": match["title"],
+                    "artist": match["artist"],
+                    "cover_url": match.get("cover_url"),
                 },
-                "confidence": round(confidence, 4),
+                "confidence": 1.0,
             }
-        else:
-            result_data = {"match": None, "confidence": round(confidence, 4)}
+            await r.setex(f"recognition:{task_id}:status", 300, "completed")
+            await r.setex(f"recognition:{task_id}:result", 300, json.dumps(result_data))
+            return
+
+        await r.setex(f"recognition:{task_id}:status", 300, "matching_local")
+        fp = await extract_fingerprint_async(audio_bytes, filename)
+        if fp:
+            result = await db.execute(select(Track).where(Track.fingerprint.isnot(None)))
+            tracks = result.scalars().all()
+            stored_fingerprints: list[list[list[float]]] = []
+            for t in tracks:
+                if t.fingerprint:
+                    stored_fingerprints.append(t.fingerprint)
+            if stored_fingerprints:
+                best_idx, confidence = match_fingerprint(fp, stored_fingerprints, threshold=0.65)
+                if best_idx >= 0:
+                    matched_track = tracks[best_idx]
+                    result_data = {
+                        "match": {
+                            "track_id": str(matched_track.id),
+                            "title": matched_track.title,
+                            "artist": matched_track.artist,
+                            "file_url": matched_track.file_url,
+                        },
+                        "confidence": round(confidence, 4),
+                    }
+                    await r.setex(f"recognition:{task_id}:status", 300, "completed")
+                    await r.setex(f"recognition:{task_id}:result", 300, json.dumps(result_data))
+                    return
 
         await r.setex(f"recognition:{task_id}:status", 300, "completed")
-        await r.setex(f"recognition:{task_id}:result", 300, json.dumps(result_data))
+        await r.setex(f"recognition:{task_id}:result", 300, json.dumps({"match": None, "confidence": 0.0}))
     except Exception as exc:
         await r.setex(f"recognition:{task_id}:status", 300, "error")
         await r.setex(f"recognition:{task_id}:result", 300, json.dumps({"error": str(exc)}))
+
+
+async def shazam_recognize(audio_bytes: bytes) -> dict | None:
+    try:
+        from shazamio import Shazam
+        shazam = Shazam()
+        result = await shazam.recognize(audio_bytes)
+        track = result.get("track", {})
+        title = track.get("title") or track.get("heading", {}).get("title")
+        artist = track.get("subtitle") or track.get("heading", {}).get("subtitle")
+        if not title:
+            return None
+        images = track.get("images", {})
+        cover_url = images.get("coverarthq") or images.get("coverart") or images.get("background")
+        return {"title": title, "artist": artist or "Unknown", "cover_url": cover_url}
+    except Exception:
+        return None
 
 
 async def extract_fingerprint_async(audio_bytes: bytes, filename: str) -> Optional[list[list[float]]]:
