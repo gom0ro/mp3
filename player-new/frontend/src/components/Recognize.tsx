@@ -48,18 +48,20 @@ export default function Recognize() {
         await new Promise(r => setTimeout(r, 1000))
         if (!activeRef.current) return
         const { data: res } = await tracksApi.recognizeStatus(taskId)
-        if (res.status === 'found') {
-          setResult(res)
-          setStatus('found')
+        if (res.status === 'completed') {
+          if (res.result?.match) {
+            setResult({ ...res.result.match, confidence: res.result.confidence, status: 'found' })
+            setStatus('found')
+          } else {
+            setStatus('not_found')
+          }
           return
-        } else if (res.status === 'not_found') {
-          setResult(res)
+        } else if (res.status === 'error') {
           setStatus('not_found')
           return
         }
       }
       setStatus('not_found')
-      setResult({ status: 'not_found' })
     } catch {
       setStatus('not_found')
       setResult({ status: 'not_found' })
