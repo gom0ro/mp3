@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy import select as sa_select
 
 from app.config import settings
 from app.db import engine, Base
@@ -65,6 +66,21 @@ async def trigger_seed():
         from seed import seed
         await seed()
         return {"status": "ok", "message": "Seed completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/admin/tracks")
+async def clear_all_tracks():
+    try:
+        from app.models.track import Track
+        from app.db import async_session
+        async with async_session() as session:
+            tracks = await session.execute(sa_select(Track))
+            for t in tracks.scalars():
+                await session.delete(t)
+            await session.commit()
+        return {"status": "ok", "message": "All tracks deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
