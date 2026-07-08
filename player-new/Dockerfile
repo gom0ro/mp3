@@ -10,6 +10,7 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
-COPY --from=frontend-builder /frontend/dist /app/../frontend/dist
+RUN mkdir -p /app/frontend_dist
+COPY --from=frontend-builder /frontend/dist /app/frontend_dist
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
