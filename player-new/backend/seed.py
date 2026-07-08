@@ -151,7 +151,8 @@ async def seed():
 
         existing = await session.execute(sa_select(Track).limit(1))
         if existing.scalars().first():
-            # update existing tracks with cover_url where missing
+            needs_commit = False
+
             rows = await session.execute(sa_select(Track).where(Track.cover_url.is_(None)))
             tracks_no_cover = rows.scalars().all()
             if tracks_no_cover:
@@ -161,9 +162,22 @@ async def seed():
                     if cover:
                         t.cover_url = cover
                         print(f"  {t.title}: {cover}")
+                needs_commit = True
+
+            rows = await session.execute(sa_select(Track).where(Track.file_url.like("http://localhost:8000/static/audio/%")))
+            tracks_local_url = rows.scalars().all()
+            if tracks_local_url:
+                print(f"Fixing file_url for {len(tracks_local_url)} existing tracks...")
+                for t in tracks_local_url:
+                    old_url = t.file_url
+                    t.file_url = old_url.replace("http://localhost:8000", "")
+                    print(f"  {t.title}: {old_url} -> {t.file_url}")
+                needs_commit = True
+
+            if needs_commit:
                 await session.commit()
             else:
-                print("All tracks already have covers")
+                print("All tracks already have covers and correct file_url")
             return
 
         samples = ["sample1.mp3", "sample2.mp3", "sample3.mp3"]
