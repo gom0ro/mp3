@@ -2,12 +2,19 @@ import { useRef, useEffect, useCallback } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { useTracksStore } from '../store/tracksStore'
 import type { Track } from '../types'
+import { tracksApi } from '../api/tracks'
+import Hls from 'hls.js'
 
 export const _audio = new Audio()
 let _audioCtx: AudioContext | null = null
 let _analyser: AnalyserNode | null = null
 let _source: MediaElementAudioSourceNode | null = null
 let _currentTrackId: string | null = null
+let _hls: Hls | null = null
+
+export const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+let _filters: BiquadFilterNode[] = []
+let _autoGain: GainNode | null = null
 
 function ensureAudioCtx() {
   if (!_audioCtx) {
@@ -16,7 +23,28 @@ function ensureAudioCtx() {
     _analyser = _audioCtx.createAnalyser()
     _analyser.fftSize = 256
     _analyser.smoothingTimeConstant = 0.85
-    _source.connect(_analyser)
+
+    _filters = eqBands.map((freq, i) => {
+      const filter = _audioCtx!.createBiquadFilter()
+      filter.type = i === 0 ? 'lowshelf' : i === eqBands.length - 1 ? 'highshelf' : 'peaking'
+      filter.frequency.value = freq
+      filter.Q.value = 1
+      filter.gain.value = 0
+      return filter
+    })
+
+    _autoGain = _audioCtx.createGain()
+    _autoGain.gain.value = 1
+
+    let prevNode: AudioNode = _source
+    prevNode.connect(_autoGain)
+    prevNode = _autoGain
+
+    _filters.forEach(filter => {
+      prevNode.connect(filter)
+      prevNode = filter
+    })
+    prevNode.connect(_analyser)
     _analyser.connect(_audioCtx.destination)
   }
   if (_audioCtx.state === 'suspended') _audioCtx.resume()
@@ -37,9 +65,43 @@ export function playTrack(track: Track) {
   if (_currentTrackId === track.id && !_audio.paused) return
   ensureAudioCtx()
   _currentTrackId = track.id
-  _audio.src = resolveFileUrl(track.file_url)
-  _audio.load()
-  _audio.play().catch(() => {})
+  
+  const applyGain = () => {
+    if (_autoGain && _audioCtx) {
+      const targetLoudness = -14
+      const trackLoudness = track.loudness ?? targetLoudness
+      let diff = targetLoudness - trackLoudness
+      if (diff > 10) diff = 10
+      if (diff < -15) diff = -15
+      const gain = Math.pow(10, diff / 20)
+      _autoGain.gain.setTargetAtTime(gain, _audioCtx.currentTime, 0.5)
+    }
+  }
+
+  const url = resolveFileUrl(track.file_url)
+  if (url.endsWith('.m3u8')) {
+    if (Hls.isSupported()) {
+      if (_hls) _hls.destroy()
+      _hls = new Hls()
+      _hls.loadSource(url)
+      _hls.attachMedia(_audio)
+      _hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        applyGain()
+        _audio.play().catch(() => {})
+      })
+    } else if (_audio.canPlayType('application/vnd.apple.mpegurl')) {
+      _audio.src = url
+      _audio.load()
+      applyGain()
+      _audio.play().catch(() => {})
+    }
+  } else {
+    if (_hls) { _hls.destroy(); _hls = null }
+    _audio.src = url
+    _audio.load()
+    applyGain()
+    _audio.play().catch(() => {})
+  }
 }
 
 export function useAudioEngine() {
@@ -49,7 +111,7 @@ export function useAudioEngine() {
   const sourceRef = useRef(_source)
 
   const {
-    isPlaying, currentTime, duration, volume, repeatMode, shuffle, queue, currentIndex,
+    isPlaying, currentTime, duration, volume, repeatMode, shuffle, queue, currentIndex, automix,
     setIsPlaying, setCurrentTime, setDuration, setVolume, setRepeatMode, setShuffle, setCurrentIndex
   } = usePlayerStore()
 
@@ -65,9 +127,43 @@ export function useAudioEngine() {
     initAudio()
     if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume()
     _currentTrackId = track.id
-    audioRef.current.src = resolveFileUrl(track.file_url)
-    audioRef.current.load()
-    audioRef.current.play().catch(() => {})
+    
+    const applyGain = () => {
+      if (_autoGain && audioCtxRef.current) {
+        const targetLoudness = -14
+        const trackLoudness = track.loudness ?? targetLoudness
+        let diff = targetLoudness - trackLoudness
+        if (diff > 10) diff = 10
+        if (diff < -15) diff = -15
+        const gain = Math.pow(10, diff / 20)
+        _autoGain.gain.setTargetAtTime(gain, audioCtxRef.current.currentTime, 0.5)
+      }
+    }
+
+    const url = resolveFileUrl(track.file_url)
+    if (url.endsWith('.m3u8')) {
+      if (Hls.isSupported()) {
+        if (_hls) _hls.destroy()
+        _hls = new Hls()
+        _hls.loadSource(url)
+        _hls.attachMedia(audioRef.current)
+        _hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          applyGain()
+          audioRef.current.play().catch(() => {})
+        })
+      } else if (audioRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+        audioRef.current.src = url
+        audioRef.current.load()
+        applyGain()
+        audioRef.current.play().catch(() => {})
+      }
+    } else {
+      if (_hls) { _hls.destroy(); _hls = null }
+      audioRef.current.src = url
+      audioRef.current.load()
+      applyGain()
+      audioRef.current.play().catch(() => {})
+    }
   }, [initAudio])
 
   const toggle = useCallback(() => {
@@ -97,7 +193,28 @@ export function useAudioEngine() {
   useEffect(() => {
     const a = audioRef.current
     const onTime = () => { setCurrentTime(a.currentTime) }
-    const onEnd = () => { if (repeatMode === 2) { a.currentTime = 0; a.play() } else if (currentIndex < queue.length - 1 || repeatMode > 0) { setCurrentIndex((currentIndex + 1) % queue.length) } }
+    const onEnd = async () => { 
+      if (repeatMode === 2) { 
+        a.currentTime = 0; a.play() 
+      } else if (currentIndex < queue.length - 1 || repeatMode > 0) { 
+        setCurrentIndex((currentIndex + 1) % queue.length) 
+      } else if (usePlayerStore.getState().automix && queue.length > 0) {
+        try {
+          const currentTrack = queue[currentIndex]
+          if (currentTrack) {
+            const res = await tracksApi.getRecommendations(currentTrack.id)
+            const newTracks = res.data.tracks
+            if (newTracks && newTracks.length > 0) {
+              const nextTrack = newTracks[0]
+              usePlayerStore.getState().addToQueue(nextTrack)
+              setCurrentIndex(currentIndex + 1)
+            }
+          }
+        } catch (err) {
+          console.error('Automix error', err)
+        }
+      }
+    }
     const onPlay = () => setIsPlaying(true)
     const onPause = () => setIsPlaying(false)
     const onLoad = () => {
@@ -117,11 +234,52 @@ export function useAudioEngine() {
     return () => { a.removeEventListener('timeupdate', onTime); a.removeEventListener('ended', onEnd); a.removeEventListener('play', onPlay); a.removeEventListener('pause', onPause); a.removeEventListener('loadedmetadata', onLoad); a.removeEventListener('error', onError) }
   }, [currentIndex, queue.length, repeatMode, setCurrentIndex, setCurrentTime, setDuration, setIsPlaying])
 
+  const eqEnabled = usePlayerStore(s => s.eqEnabled)
+  const storeBands = usePlayerStore(s => s.eqBands)
+
+  useEffect(() => {
+    if (_filters.length > 0) {
+      _filters.forEach((filter, i) => {
+        filter.gain.value = eqEnabled ? storeBands[i] : 0
+      })
+    }
+  }, [eqEnabled, storeBands])
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && queue[currentIndex]) {
+      const currentTrack = queue[currentIndex]
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        artwork: [
+          { src: resolveFileUrl(currentTrack.cover_url || ''), sizes: '512x512', type: 'image/jpeg' }
+        ]
+      })
+
+      navigator.mediaSession.setActionHandler('play', toggle)
+      navigator.mediaSession.setActionHandler('pause', toggle)
+      navigator.mediaSession.setActionHandler('previoustrack', () => skip(-1))
+      navigator.mediaSession.setActionHandler('nexttrack', () => skip(1))
+    }
+  }, [currentIndex, queue, toggle, skip])
+
   useEffect(() => {
     if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
       const currentTrack = queue[currentIndex]
       if (_currentTrackId !== currentTrack.id) {
         play(currentTrack)
+      }
+    } else {
+      if (_currentTrackId !== null) {
+        _currentTrackId = null
+        if (!audioRef.current.paused) {
+          audioRef.current.pause()
+        }
+        audioRef.current.src = ''
+        if (_hls) {
+          _hls.destroy()
+          _hls = null
+        }
       }
     }
   }, [currentIndex, queue, play])

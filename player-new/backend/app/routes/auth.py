@@ -122,3 +122,29 @@ async def get_me(user: User = Depends(get_current_user)):
         auth_provider=user.auth_provider.value,
         created_at=user.created_at.isoformat(),
     )
+
+
+@router.get("/me/likes", response_model=list[str])
+async def get_my_likes(user: User = Depends(get_current_user)):
+    return [str(t) for t in (user.liked_track_ids or [])]
+
+
+@router.post("/me/likes/{track_id}", response_model=list[str])
+async def add_like(track_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    current_ids = [str(t) for t in (user.liked_track_ids or [])]
+    if track_id not in current_ids:
+        current_ids.append(track_id)
+        user.liked_track_ids = current_ids
+        await db.commit()
+    return current_ids
+
+
+@router.delete("/me/likes/{track_id}", response_model=list[str])
+async def remove_like(track_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    current_ids = [str(t) for t in (user.liked_track_ids or [])]
+    if track_id in current_ids:
+        current_ids.remove(track_id)
+        user.liked_track_ids = current_ids
+        await db.commit()
+    return current_ids
+

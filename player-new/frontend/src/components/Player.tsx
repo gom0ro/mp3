@@ -4,6 +4,7 @@ import { usePlayerStore } from '../store/playerStore'
 import ProgressBar from './ProgressBar'
 import VolumeControl from './VolumeControl'
 import SleepTimer from './SleepTimer'
+import Equalizer from './Equalizer'
 import { TrackCoverImg } from '../utils/cover'
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -74,7 +75,7 @@ export default function Player() {
 
       {/* Progress */}
       <div className="w-full max-w-sm">
-        <ProgressBar currentTime={currentTime} duration={duration} onSeek={seek} />
+        <ProgressBar currentTime={currentTime} duration={duration} waveform={track.waveform} onSeek={seek} />
       </div>
 
       {/* Controls */}
@@ -95,6 +96,11 @@ export default function Player() {
       <div className="flex items-center justify-center max-w-xs mx-auto w-full">
         <VolumeControl volume={volume} onVolumeChange={setVol} />
         <SleepTimer />
+      </div>
+
+      {/* Equalizer */}
+      <div className="w-full mt-2">
+        <Equalizer />
       </div>
 
       {/* Queue */}

@@ -22,6 +22,8 @@ class Track(Base):
     cover_url = Column(String(1024), nullable=True, default=None)
     mime_type = Column(String(64), nullable=False, default="audio/mpeg")
     fingerprint_hash = Column(Text, nullable=True, index=True)
+    waveform = Column(JSON, nullable=True)
+    loudness = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User", back_populates="tracks")

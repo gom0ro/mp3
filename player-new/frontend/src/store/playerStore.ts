@@ -4,6 +4,8 @@ import type { Track, PlaybackState } from '../types'
 interface PlayerStore extends PlaybackState {
   queue: Track[]
   currentIndex: number
+  eqEnabled: boolean
+  eqBands: number[]
   setQueue: (tracks: Track[]) => void
   addToQueue: (track: Track) => void
   removeFromQueue: (id: string) => void
@@ -15,6 +17,10 @@ interface PlayerStore extends PlaybackState {
   setVolume: (v: number) => void
   setRepeatMode: (m: 0|1|2) => void
   setShuffle: (v: boolean) => void
+  automix: boolean
+  setAutomix: (v: boolean) => void
+  setEqEnabled: (v: boolean) => void
+  setEqBand: (index: number, value: number) => void
 }
 
 export const usePlayerStore = create<PlayerStore>((set) => ({
@@ -24,8 +30,11 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   volume: 0.7,
   repeatMode: 0,
   shuffle: false,
+  automix: true,
   queue: [],
   currentIndex: -1,
+  eqEnabled: false,
+  eqBands: [0,0,0,0,0,0,0,0,0,0],
   setQueue: (queue) => set({ queue, currentIndex: queue.length > 0 ? 0 : -1 }),
   addToQueue: (track) => set(s => ({ queue: [...s.queue, track] })),
   removeFromQueue: (id) => set(s => {
@@ -59,4 +68,11 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   setVolume: (volume) => set({ volume }),
   setRepeatMode: (repeatMode) => set({ repeatMode }),
   setShuffle: (shuffle) => set({ shuffle }),
+  setAutomix: (automix) => set({ automix }),
+  setEqEnabled: (eqEnabled) => set({ eqEnabled }),
+  setEqBand: (index, value) => set(s => {
+    const newBands = [...s.eqBands];
+    newBands[index] = value;
+    return { eqBands: newBands };
+  }),
 }))

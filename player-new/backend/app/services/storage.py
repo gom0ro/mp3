@@ -18,13 +18,18 @@ class LocalStorage:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         return self.base_dir
 
-    def upload_file(self, file_obj: BinaryIO, filename: str) -> str:
-        track_dir = self._ensure_dir() / uuid.uuid4().hex
+    def get_track_dir(self) -> tuple[Path, str]:
+        track_uuid = uuid.uuid4().hex
+        track_dir = self._ensure_dir() / track_uuid
         track_dir.mkdir(parents=True, exist_ok=True)
+        return track_dir, f"/static/audio/{track_uuid}"
+
+    def upload_file(self, file_obj: BinaryIO, filename: str) -> str:
+        track_dir, url_prefix = self.get_track_dir()
         dest = track_dir / filename
         content = file_obj.read()
         dest.write_bytes(content)
-        return f"/static/audio/{track_dir.name}/{filename}"
+        return f"{url_prefix}/{filename}"
 
     def delete_file(self, url: str) -> None:
         prefix = "/static/audio/"

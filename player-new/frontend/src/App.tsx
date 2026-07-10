@@ -10,7 +10,7 @@ import BottomNav from './components/BottomNav'
 import AuthModal from './components/AuthModal'
 import { useAuth } from './hooks/useAuth'
 import { usePlayerStore } from './store/playerStore'
-import { _audio } from './hooks/useAudioEngine'
+import { useAudioEngine } from './hooks/useAudioEngine'
 import type { Track } from './types'
 
 type Tab = 'search' | 'player' | 'media' | 'recognize' | 'profile'
@@ -31,16 +31,20 @@ export default function App() {
     }
   }, [])
 
+  const { toggle, skip, setVol, volume } = useAudioEngine()
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.code === 'Space') { e.preventDefault(); if (queue.length > 0) { _audio.paused ? _audio.play() : _audio.pause() } }
-      if (e.code === 'ArrowRight') { e.preventDefault(); if (currentIndex < queue.length - 1) setCurrentIndex(currentIndex + 1) }
-      if (e.code === 'ArrowLeft') { e.preventDefault(); if (_audio.currentTime > 3) { _audio.currentTime = 0 } else if (currentIndex > 0) setCurrentIndex(currentIndex - 1) }
+      if (e.code === 'Space') { e.preventDefault(); toggle() }
+      if (e.code === 'ArrowRight') { e.preventDefault(); skip(1) }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); skip(-1) }
+      if (e.code === 'ArrowUp') { e.preventDefault(); setVol(Math.min(1, volume + 0.1)) }
+      if (e.code === 'ArrowDown') { e.preventDefault(); setVol(Math.max(0, volume - 0.1)) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [queue, currentIndex, setCurrentIndex])
+  }, [toggle, skip, setVol, volume])
 
   // Restore queue from localStorage
   useEffect(() => {

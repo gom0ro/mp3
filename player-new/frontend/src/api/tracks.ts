@@ -7,4 +7,5 @@ export const tracksApi = {
   fingerprint: (id: string) => client.post(`/tracks/${id}/fingerprint`),
   recognize: (blob: Blob) => { const fd = new FormData(); fd.append('file', blob); return client.post('/recognize', fd) },
   recognizeStatus: (taskId: string) => client.get(`/recognize/status/${taskId}`),
+  getRecommendations: (id: string) => client.get(`/tracks/${id}/recommendations`),
 }

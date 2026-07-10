@@ -23,6 +23,8 @@ export default function Playlist() {
   const setQueue = usePlayerStore(s => s.setQueue)
   const setCurrentIndex = usePlayerStore(s => s.setCurrentIndex)
   const addToQueue = usePlayerStore(s => s.addToQueue)
+  const automix = usePlayerStore(s => s.automix)
+  const setAutomix = usePlayerStore(s => s.setAutomix)
   const { playlists, fetch: fetchPlaylists, addTrack: addTrackToPlaylist, removeTrack: removeTrackFromPlaylist } = usePlaylistsStore()
   const { toggle: toggleLike, isLiked } = useLikedTracks()
   const [contextMenu, setContextMenu] = useState<{ track: Track; x: number; y: number } | null>(null)
@@ -90,6 +92,13 @@ export default function Playlist() {
             >
               <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M16 3h5v5" /><path d="M21 3l-7 7" /><path d="M8 21H3v-5" /><path d="M3 21l7-7" /><path d="M16 21h5v-5" /><path d="M21 21l-3.5-3.5" /><path d="M3 3l3.5 3.5" /></svg>
               Shuffle
+            </button>
+            <button onClick={() => setAutomix(!automix)}
+              className={`flex items-center gap-1 px-3 py-1.5 ${automix ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 hover:bg-white/10 text-white'} text-xs font-semibold rounded-full transition-colors cursor-pointer`}
+              title="Бесконечное воспроизведение похожих треков"
+            >
+              <svg viewBox="0 0 24 24" width={12} height={12} fill="currentColor"><path d="M12 2.5a.75.75 0 0 1 .75.75v3.25h3.25a.75.75 0 0 1 0 1.5h-3.25v3.25a.75.75 0 0 1-1.5 0v-3.25H8.05a.75.75 0 0 1 0-1.5h3.25V3.25a.75.75 0 0 1 .75-.75z"/><path d="M16.92 11.23a.75.75 0 0 1 1.05-.12l4.8 3.75a.75.75 0 0 1 0 1.18l-4.8 3.75a.75.75 0 1 1-.92-1.18L20.67 15.6h-7.14a4.53 4.53 0 0 0-4.05 2.52 4.5 4.5 0 0 1 7.23-5.26.75.75 0 0 1-.92 1.18 3 3 0 0 0-5.11 3.23 3.03 3.03 0 0 1 2.85-1.92h7.14l-3.62-2.83a.75.75 0 0 1-.13-1.05z"/></svg>
+              Automix
             </button>
           </div>
         )}

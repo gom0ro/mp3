@@ -26,6 +26,8 @@ class TrackResponse(BaseModel):
     duration: float
     file_size: int
     mime_type: str
+    waveform: list[float] | None = None
+    loudness: float | None = None
     created_at: str
 
 
@@ -58,6 +60,8 @@ async def list_tracks(
                 duration=t.duration,
                 file_size=t.file_size,
                 mime_type=t.mime_type,
+                waveform=t.waveform,
+                loudness=t.loudness,
                 created_at=t.created_at.isoformat(),
             )
             for t in tracks
@@ -78,7 +82,36 @@ async def upload_track(
 
     import io
     file_obj = io.BytesIO(contents)
-    file_url = storage.upload_file(file_obj, file.filename)
+    
+    from app.services.storage import USE_S3, storage
+    
+    if not USE_S3 and hasattr(storage, 'get_track_dir'):
+        import tempfile
+        import os
+        import asyncio
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
+        
+        try:
+            track_dir, base_url = storage.get_track_dir()
+            m3u8_path = track_dir / "index.m3u8"
+            
+            cmd = [
+                "ffmpeg", "-i", tmp_path, 
+                "-c:a", "aac", "-b:a", "192k", 
+                "-f", "hls", "-hls_time", "10", 
+                "-hls_list_size", "0", 
+                str(m3u8_path)
+            ]
+            process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await process.communicate()
+            
+            file_url = f"{base_url}/index.m3u8"
+        finally:
+            os.unlink(tmp_path)
+    else:
+        file_url = storage.upload_file(file_obj, file.filename)
 
     track_title = title or (file.filename.rsplit(".", 1)[0] if "." in file.filename else file.filename)
     track_artist = artist or "Unknown Artist"
@@ -87,16 +120,28 @@ async def upload_track(
     mime_type = mimetypes.guess_type(file.filename)[0] or "audio/mpeg"
 
     duration = 0.0
-    if file.filename.endswith(".wav"):
-        try:
-            from scipy.io import wavfile
-            import io as _io
-            sample_rate, data = wavfile.read(_io.BytesIO(contents))
-            duration = float(data.shape[0] / sample_rate) if data.ndim == 1 else float(data.shape[0] / sample_rate)
-        except Exception:
-            duration = 0.0
-    else:
-        duration = 0.0
+    waveform = None
+    loudness = None
+
+    try:
+        from pydub import AudioSegment
+        audio = AudioSegment.from_file(io.BytesIO(contents))
+        duration = len(audio) / 1000.0
+        loudness = audio.dBFS
+
+        if duration > 0:
+            points = 100
+            chunk_length = max(1, len(audio) // points)
+            wave = []
+            for i in range(points):
+                chunk = audio[i * chunk_length : (i + 1) * chunk_length]
+                if len(chunk) > 0:
+                    wave.append(chunk.rms)
+            max_rms = max(wave) if wave else 1
+            if max_rms > 0:
+                waveform = [round(w / max_rms, 3) for w in wave]
+    except Exception as e:
+        print("Audio processing error:", e)
 
     track = Track(
         user_id=user.id,
@@ -107,6 +152,8 @@ async def upload_track(
         duration=duration,
         file_size=file_size,
         mime_type=mime_type,
+        waveform=waveform,
+        loudness=loudness,
     )
     db.add(track)
     await db.commit()
@@ -122,6 +169,8 @@ async def upload_track(
         duration=track.duration,
         file_size=track.file_size,
         mime_type=track.mime_type,
+        waveform=track.waveform,
+        loudness=track.loudness,
         created_at=track.created_at.isoformat(),
     )
 
@@ -145,6 +194,8 @@ async def get_track(
         duration=track.duration,
         file_size=track.file_size,
         mime_type=track.mime_type,
+        waveform=track.waveform,
+        loudness=track.loudness,
         created_at=track.created_at.isoformat(),
     )
 
@@ -209,3 +260,43 @@ def wavfile_read_safe(path: str):
     elif data.dtype == np.uint8:
         data = (data.astype(np.float32) - 128.0) / 128.0
     return sample_rate, data
+
+
+@router.get("/{track_id}/recommendations", response_model=TrackListResponse)
+async def get_recommendations(
+    track_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    track = result.scalar_one_or_none()
+    
+    query = select(Track).where(Track.id != track_id)
+    if track:
+        query = query.order_by((Track.artist == track.artist).desc(), Track.created_at.desc())
+    else:
+        query = query.order_by(Track.created_at.desc())
+        
+    query = query.limit(5)
+    res = await db.execute(query)
+    recs = res.scalars().all()
+    
+    return TrackListResponse(
+        tracks=[
+            TrackResponse(
+                id=str(t.id),
+                title=t.title,
+                artist=t.artist,
+                filename=t.filename,
+                file_url=t.file_url,
+                cover_url=t.cover_url,
+                duration=t.duration,
+                file_size=t.file_size,
+                mime_type=t.mime_type,
+                waveform=t.waveform,
+                loudness=t.loudness,
+                created_at=t.created_at.isoformat(),
+            )
+            for t in recs
+        ]
+    )
+

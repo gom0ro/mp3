@@ -39,10 +39,11 @@ class PlaylistUpdate(BaseModel):
 
 @router.get("", response_model=PlaylistListResponse)
 async def list_playlists(
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Playlist).order_by(Playlist.updated_at.desc())
+        select(Playlist).where(Playlist.user_id == user.id).order_by(Playlist.updated_at.desc())
     )
     playlists = result.scalars().all()
     return PlaylistListResponse(
@@ -63,12 +64,9 @@ async def list_playlists(
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
 async def create_playlist(
     body: PlaylistCreate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No user found")
     playlist = Playlist(
         user_id=user.id,
         name=body.name,
@@ -113,10 +111,11 @@ async def get_playlist(
 async def update_playlist(
     playlist_id: uuid.UUID,
     body: PlaylistUpdate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Playlist).where(Playlist.id == playlist_id)
+        select(Playlist).where(Playlist.id == playlist_id, Playlist.user_id == user.id)
     )
     playlist = result.scalar_one_or_none()
     if not playlist:
@@ -142,10 +141,11 @@ async def update_playlist(
 @router.delete("/{playlist_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_playlist(
     playlist_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Playlist).where(Playlist.id == playlist_id)
+        select(Playlist).where(Playlist.id == playlist_id, Playlist.user_id == user.id)
     )
     playlist = result.scalar_one_or_none()
     if not playlist:
@@ -158,10 +158,11 @@ async def delete_playlist(
 async def add_track_to_playlist(
     playlist_id: uuid.UUID,
     track_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Playlist).where(Playlist.id == playlist_id)
+        select(Playlist).where(Playlist.id == playlist_id, Playlist.user_id == user.id)
     )
     playlist = result.scalar_one_or_none()
     if not playlist:
@@ -189,10 +190,11 @@ async def add_track_to_playlist(
 async def remove_track_from_playlist(
     playlist_id: uuid.UUID,
     track_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Playlist).where(Playlist.id == playlist_id)
+        select(Playlist).where(Playlist.id == playlist_id, Playlist.user_id == user.id)
     )
     playlist = result.scalar_one_or_none()
     if not playlist:
