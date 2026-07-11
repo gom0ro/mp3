@@ -2,14 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    VitePWA({
+    mode === 'production' && VitePWA({
       registerType: 'autoUpdate',
-      devOptions: {
-        enabled: true
-      },
       manifest: {
         name: 'VibePlayer',
         short_name: 'VibePlayer',
@@ -22,4 +19,4 @@ export default defineConfig({
     })
   ],
   server: { port: 5173, proxy: { '/api': 'http://localhost:8000', '/ws': { target: 'ws://localhost:8000', ws: true }, '/static': 'http://localhost:8000' } }
-})
+}))

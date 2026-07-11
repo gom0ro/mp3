@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Integer, Text, ForeignKey, DateTime, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Float, Integer, Text, ForeignKey, DateTime, JSON, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db import Base
@@ -10,8 +9,8 @@ from app.db import Base
 class Track(Base):
     __tablename__ = "tracks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(256), nullable=False)
     artist = Column(String(256), nullable=False)
     filename = Column(String(512), nullable=False)

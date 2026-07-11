@@ -24,10 +24,11 @@ export default function App() {
   const currentIndex = usePlayerStore(s => s.currentIndex)
   const setCurrentIndex = usePlayerStore(s => s.setCurrentIndex)
 
-  // Register service worker for offline
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker.getRegistrations().then(regs =>
+        regs.forEach(r => r.unregister())
+      )
     }
   }, [])
 
